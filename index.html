@@ -669,7 +669,7 @@ body { font-family: var(--font-body); background: var(--navy); color: var(--txt-
 // ═══════════════════════════════════════════
 const SUPABASE_URL = 'https://utupwjbjjlwsobeihnog.supabase.co/rest/v1/';
 const SUPABASE_ANON_KEY = 'sb_publishable_JrbbxMWnA-iRR417hN58GA_qO6dhA9z';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══════════════════════════════════════════
 // DATA
@@ -689,9 +689,9 @@ let realtimeChannel = null;
 // ═══════════════════════════════════════════
 async function loadData() {
   const [{ data: recData, error: recErr }, { data: auditData, error: auditErr }, { data: fbData, error: fbErr }] = await Promise.all([
-    supabase.from('resignation_records').select('*').order('created_at', { ascending: false }),
-    supabase.from('audit_log').select('*').order('ts', { ascending: false }).limit(300),
-    supabase.from('feedback').select('*').order('created_at', { ascending: false })
+    sb.from('resignation_records').select('*').order('created_at', { ascending: false }),
+    sb.from('audit_log').select('*').order('ts', { ascending: false }).limit(300),
+    sb.from('feedback').select('*').order('created_at', { ascending: false })
   ]);
   if (recErr || auditErr || fbErr) {
     console.error('Load error:', recErr || auditErr || fbErr);
@@ -720,22 +720,22 @@ function fromDbRecord(r) {
 // everyone's screen refreshes automatically.
 function subscribeRealtime() {
   if (realtimeChannel) return;
-  realtimeChannel = supabase.channel('nge2027-live')
+  realtimeChannel = sb.channel('nge2027-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'resignation_records' }, async () => { await refreshRecordsOnly(); renderAll(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, async () => { await refreshAuditOnly(); renderAuditFull(); renderDashAudit(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, async () => { await refreshFeedbackOnly(); renderFeedback(); })
     .subscribe();
 }
 async function refreshRecordsOnly() {
-  const { data } = await supabase.from('resignation_records').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('resignation_records').select('*').order('created_at', { ascending: false });
   records = (data || []).map(fromDbRecord);
 }
 async function refreshAuditOnly() {
-  const { data } = await supabase.from('audit_log').select('*').order('ts', { ascending: false }).limit(300);
+  const { data } = await sb.from('audit_log').select('*').order('ts', { ascending: false }).limit(300);
   auditLog = (data || []).map(a => ({ action: a.action, detail: a.detail, user: a.user_name, role: a.role, ts: a.ts }));
 }
 async function refreshFeedbackOnly() {
-  const { data } = await supabase.from('feedback').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('feedback').select('*').order('created_at', { ascending: false });
   feedback = (data || []).map(f => ({ name: f.name, text: f.comment, role: f.role, ts: f.created_at }));
 }
 
@@ -743,7 +743,7 @@ async function submitFeedback() {
   const name = document.getElementById('fb-name').value.trim() || currentUser.name || 'Anonymous';
   const text = document.getElementById('fb-text').value.trim();
   if (!text) { alert('Please write a comment first.'); return; }
-  const { error } = await supabase.from('feedback').insert({ name, role: currentUser.role, comment: text });
+  const { error } = await sb.from('feedback').insert({ name, role: currentUser.role, comment: text });
   if (error) { alert('Could not save your comment: ' + error.message); return; }
   document.getElementById('fb-text').value = '';
   await logAudit('Feedback', `${name} left a comment on the prototype`);
@@ -770,7 +770,7 @@ function showToast() {
 }
 
 async function logAudit(action, detail) {
-  const { error } = await supabase.from('audit_log').insert({
+  const { error } = await sb.from('audit_log').insert({
     action, detail, user_id: currentUser.id, user_name: currentUser.name || 'Unknown', role: currentUser.role
   });
   if (error) console.error('Audit log error:', error);
@@ -804,7 +804,7 @@ async function doSignup() {
   const password = document.getElementById('login-pass').value;
   if (!fullName || !email || !password) { showLoginError('Please fill in your name, email and a password.'); return; }
   if (password.length < 6) { showLoginError('Password must be at least 6 characters.'); return; }
-  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
   if (error) { showLoginError(error.message); return; }
   document.getElementById('login-error').style.display = 'none';
   if (!data.session) {
@@ -819,15 +819,15 @@ async function doLogin() {
   const email = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
   if (!email || !password) { showLoginError('Please enter your email and password.'); return; }
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { showLoginError(error.message); return; }
   document.getElementById('login-error').style.display = 'none';
   await afterSignIn();
 }
 async function afterSignIn() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) { showLoginError('Sign-in succeeded but no session was returned — please try again.'); return; }
-  const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: profile, error: profileErr } = await sb.from('profiles').select('*').eq('id', user.id).single();
   if (profileErr || !profile) { showLoginError('Signed in, but your profile could not be loaded: ' + (profileErr ? profileErr.message : 'not found')); return; }
   currentUser = { id: user.id, name: profile.full_name, role: profile.role };
   document.getElementById('login-screen').style.display = 'none';
@@ -844,8 +844,8 @@ async function afterSignIn() {
 }
 async function doLogout() {
   await logAudit('Sign out', `${currentUser.name} signed out`);
-  if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
-  await supabase.auth.signOut();
+  if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  await sb.auth.signOut();
   currentUser = { id: null, name: '', role: 'Read-only Viewer' };
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
@@ -858,7 +858,7 @@ function applyRolePermissions() {
 
 // Returning visitor with a still-valid Supabase session: skip the login screen
 async function restoreSession() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession();
   if (session) { await afterSignIn(); }
 }
 
@@ -866,7 +866,7 @@ async function restoreSession() {
 // MANAGE USERS (Administrator only)
 // ═══════════════════════════════════════════
 async function renderUsers() {
-  const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: true });
+  const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: true });
   if (error) { console.error(error); return; }
   allUsers = data || [];
   const roleOpts = ['Administrator','Data Entry Officer','Verifying Officer','Read-only Viewer'];
@@ -879,7 +879,7 @@ async function renderUsers() {
 }
 async function changeUserRole(userId, newRole) {
   const target = allUsers.find(u => u.id === userId);
-  const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+  const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', userId);
   if (error) { alert('Could not update role: ' + error.message); renderUsers(); return; }
   await logAudit('Update', `${currentUser.name} set ${target ? target.full_name : userId}'s role to "${newRole}"`);
   await refreshAuditOnly();
@@ -942,7 +942,7 @@ async function submitRegistration() {
     entered_by: currentUser.id,
     entered_by_name: currentUser.name
   };
-  const { error } = await supabase.from('resignation_records').insert(rec);
+  const { error } = await sb.from('resignation_records').insert(rec);
   if (error) { alert('Could not save this registration: ' + error.message); return; }
   await logAudit('Create', `${currentUser.name} registered ${rec.name} (${rec.category})`);
   await refreshRecordsOnly();
@@ -961,7 +961,7 @@ async function changeStatus(id, newStatus) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   const old = rec.status;
-  const { error } = await supabase.from('resignation_records').update({ status: newStatus }).eq('id', id);
+  const { error } = await sb.from('resignation_records').update({ status: newStatus }).eq('id', id);
   if (error) { alert('Could not update status: ' + error.message); return; }
   await logAudit('Update', `${currentUser.name} changed status of ${rec.name} from "${old}" to "${newStatus}"`);
   await refreshRecordsOnly();
@@ -973,7 +973,7 @@ async function deleteRecord(id) {
   if (currentUser.role !== 'Administrator') { alert('Only an Administrator can delete records.'); return; }
   const rec = records.find(r => r.id === id);
   if (!rec || !confirm(`Remove ${rec.name} from the register?`)) return;
-  const { error } = await supabase.from('resignation_records').delete().eq('id', id);
+  const { error } = await sb.from('resignation_records').delete().eq('id', id);
   if (error) { alert('Could not delete this record: ' + error.message); return; }
   await logAudit('Delete', `${currentUser.name} removed ${rec.name} from the register`);
   await refreshRecordsOnly();
