@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="description" content="Papua New Guinea DPM — Database Management System for Public Servants & Agency Heads Resigning to Contest NGE 2027 (prototype for internal DPM/TWT review)">
+<meta name="theme-color" content="#0A1628">
+<meta name="application-name" content="DPM NGE2027 DBMS">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NGE2027 DBMS">
+<title>DPM — NGE 2027 Resignation Register (Prototype DBMS)</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS (matches PNG DRBMS prototype)
+═══════════════════════════════════════════ */
+:root {
+  --navy:        #050E1D;
+  --navy-mid:    #0A1628;
+  --navy-card:   #0F1E35;
+  --navy-hover:  #142444;
+  --gold:        #F0A500;
+  --gold-light:  #FFB822;
+  --gold-dim:    rgba(240,165,0,0.12);
+  --teal:        #00C9B1;
+  --teal-dim:    rgba(0,201,177,0.12);
+  --red:         #E8394A;
+  --red-dim:     rgba(232,57,74,0.12);
+  --blue:        #3B82F6;
+  --green:       #22C55E;
+  --border:      rgba(255,255,255,0.07);
+  --border-gold: rgba(240,165,0,0.35);
+  --txt-pri:     #F0F4FF;
+  --txt-sec:     rgba(240,244,255,0.60);
+  --txt-muted:   rgba(240,244,255,0.35);
+  --sidebar-w:   268px;
+  --topbar-h:    58px;
+  --banner-h:    30px;
+  --radius:      10px;
+  --font-head:   'Sora', sans-serif;
+  --font-body:   'Outfit', sans-serif;
+  --font-mono:   'DM Mono', monospace;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-body); background: var(--navy); color: var(--txt-pri); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; padding-top: var(--banner-h); }
+
+/* PROTOTYPE BANNER */
+#prototype-banner {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--banner-h); z-index: 10000;
+  background: repeating-linear-gradient(135deg, #E8394A, #E8394A 12px, #B8283A 12px, #B8283A 24px);
+  color: #fff; text-align: center;
+  font-family: var(--font-head); font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: center; padding: 0 10px;
+}
+
+/* LOGIN */
+#login-screen { position: fixed; top: var(--banner-h); left: 0; right: 0; bottom: 0; z-index: 9999; background: var(--navy); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+.login-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(240,165,0,0.08) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 90% 90%, rgba(0,201,177,0.06) 0%, transparent 60%); pointer-events: none; }
+.login-grid { position: absolute; inset: 0; opacity: 0.04; background-image: linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+.login-box { position: relative; z-index: 2; width: 430px; max-width: 94vw; background: var(--navy-card); border: 1px solid var(--border); border-radius: 16px; padding: 40px 36px; box-shadow: 0 24px 80px rgba(0,0,0,0.5); animation: slideUp 0.5s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.login-emblem { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.emblem-seal { width: 54px; height: 54px; flex-shrink: 0; background: var(--gold-dim); border: 1.5px solid var(--border-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.emblem-text { flex: 1; }
+.emblem-text .country { font-family: var(--font-head); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin-bottom: 3px; }
+.emblem-text .system-name { font-family: var(--font-head); font-size: 14px; font-weight: 700; line-height: 1.3; }
+.emblem-text .system-sub { font-size: 11px; color: var(--txt-muted); margin-top: 2px; }
+.login-divider { height: 1px; background: var(--border); margin-bottom: 22px; }
+.login-title { font-family: var(--font-head); font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: var(--txt-sec); margin-bottom: 22px; line-height: 1.5; }
+.l-form-group { margin-bottom: 15px; }
+.l-form-label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--txt-muted); margin-bottom: 7px; }
+.l-form-input { width: 100%; padding: 11px 14px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--txt-pri); font-family: var(--font-body); font-size: 14px; transition: border-color 0.2s, background 0.2s; outline: none; }
+.l-form-input:focus { border-color: var(--gold); background: rgba(240,165,0,0.05); }
+.l-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.l-role-chip { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 11.5px; font-weight: 500; color: var(--txt-sec); cursor: pointer; text-align: center; transition: all 0.15s; background: transparent; }
+.l-role-chip:hover { border-color: rgba(240,165,0,0.4); color: var(--gold); }
+.l-role-chip.selected { background: var(--gold-dim); border-color: var(--border-gold); color: var(--gold); }
+.l-role-chip .role-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+.login-btn { width: 100%; padding: 13px; background: var(--gold); color: var(--navy-mid); border: none; border-radius: 8px; font-family: var(--font-head); font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; transition: background 0.15s, transform 0.1s; }
+.login-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
+.login-btn:active { transform: translateY(0); }
+.login-notice { margin-top: 16px; font-size: 11px; color: var(--txt-muted); text-align: center; line-height: 1.6; }
+.login-notice a { color: var(--gold); text-decoration: none; }
+.login-footer { position: relative; z-index: 2; text-align: center; margin-top: 20px; font-size: 11px; color: var(--txt-muted); }
+.login-error { background: var(--red-dim); border: 1px solid rgba(232,57,74,0.3); border-radius: 6px; padding: 10px 14px; font-size: 12.5px; color: #FDA5AD; margin-bottom: 14px; display: none; }
+
+/* APP LAYOUT */
+#app { display: none; }
+#app.visible { display: flex; min-height: 100vh; }
+#sidebar { position: fixed; left: 0; top: var(--banner-h); bottom: 0; width: var(--sidebar-w); background: var(--navy-mid); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 200; transition: transform 0.3s ease; }
+.sb-header { padding: 18px 20px 16px; border-bottom: 1px solid var(--border); }
+.sb-logo-row { display: flex; align-items: center; gap: 12px; }
+.sb-seal { width: 38px; height: 38px; flex-shrink: 0; background: var(--gold-dim); border: 1px solid var(--border-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.sb-text .sb-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; }
+.sb-text .sb-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; line-height: 1.3; color: var(--txt-pri); }
+.sb-text .sb-version { font-size: 10px; color: var(--txt-muted); margin-top: 1px; }
+.sb-user-pill { margin-top: 12px; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; gap: 10px; }
+.sb-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--gold-dim); border: 1px solid var(--border-gold); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--gold); flex-shrink: 0; }
+.sb-user-info .sb-user-name { font-size: 12px; font-weight: 600; }
+.sb-user-info .sb-user-role { font-size: 10px; color: var(--txt-muted); }
+.sb-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
+.sb-nav::-webkit-scrollbar { width: 0; }
+.nav-section { padding: 12px 18px 5px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--txt-muted); }
+.nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 18px; cursor: pointer; font-size: 13px; font-weight: 400; color: var(--txt-sec); border-left: 2.5px solid transparent; transition: all 0.15s; position: relative; }
+.nav-item:hover { background: rgba(255,255,255,0.04); color: var(--txt-pri); border-left-color: rgba(240,165,0,0.3); }
+.nav-item.active { background: var(--gold-dim); color: var(--gold); border-left-color: var(--gold); font-weight: 600; }
+.nav-icon { width: 17px; text-align: center; font-size: 14px; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--red); color: #fff; font-size: 9px; font-weight: 700; font-family: var(--font-mono); padding: 1px 6px; border-radius: 10px; letter-spacing: 0.04em; }
+.sb-footer { padding: 14px 18px; border-top: 1px solid var(--border); }
+.sb-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(0,201,177,0.2); animation: livePulse 2s infinite; flex-shrink: 0; }
+@keyframes livePulse { 0%,100% { box-shadow: 0 0 0 3px rgba(0,201,177,0.2); } 50% { box-shadow: 0 0 0 6px rgba(0,201,177,0.05); } }
+.sb-status-txt { font-size: 11px; color: var(--txt-sec); }
+.sb-logout { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 12px; color: var(--txt-muted); cursor: pointer; background: transparent; border: none; font-family: var(--font-body); width: 100%; transition: all 0.15s; }
+.sb-logout:hover { background: var(--red-dim); color: var(--red); }
+#hamburger { display: none; position: fixed; top: calc(var(--banner-h) + 12px); left: 12px; z-index: 300; width: 38px; height: 38px; background: var(--navy-card); border: 1px solid var(--border); border-radius: 8px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+#hamburger span { display: block; width: 18px; height: 1.5px; background: var(--txt-sec); border-radius: 2px; transition: all 0.2s; }
+#main { margin-left: var(--sidebar-w); min-height: 100vh; flex: 1; }
+#topbar { position: sticky; top: var(--banner-h); z-index: 150; height: var(--topbar-h); background: rgba(5,14,29,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; align-items: center; gap: 14px; }
+.tb-title { font-family: var(--font-head); font-size: 15px; font-weight: 600; flex: 1; }
+.tb-date { font-size: 11.5px; color: var(--txt-muted); font-family: var(--font-mono); }
+.tb-actions { display: flex; gap: 8px; align-items: center; }
+.btn { padding: 7px 15px; border-radius: 7px; font-size: 12.5px; font-family: var(--font-body); font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-ghost { background: transparent; color: var(--txt-sec); border: 1px solid var(--border); }
+.btn-ghost:hover { background: rgba(255,255,255,0.05); color: var(--txt-pri); }
+.btn-gold { background: var(--gold); color: var(--navy-mid); font-weight: 700; }
+.btn-gold:hover { background: var(--gold-light); }
+.btn-red { background: var(--red-dim); color: #FDA5AD; border: 1px solid rgba(232,57,74,0.3); }
+.btn-red:hover { background: rgba(232,57,74,0.22); }
+.btn-sm { padding: 5px 11px; font-size: 11.5px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.page { display: none; padding: 24px 28px; animation: fadeIn 0.25s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.page-header { margin-bottom: 22px; }
+.page-header h2 { font-family: var(--font-head); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.page-header p { font-size: 13px; color: var(--txt-sec); line-height: 1.5; }
+
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-bottom: 20px; }
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 20px; }
+
+.card { background: var(--navy-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
+.card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--txt-muted); }
+.card-action { font-size: 12px; color: var(--gold); cursor: pointer; }
+.card-action:hover { text-decoration: underline; }
+
+.metric-card { background: var(--navy-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; position: relative; overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.metric-card.gold::before { background: linear-gradient(90deg, var(--gold), transparent); }
+.metric-card.teal::before { background: linear-gradient(90deg, var(--teal), transparent); }
+.metric-card.red::before { background: linear-gradient(90deg, var(--red), transparent); }
+.metric-card.green::before { background: linear-gradient(90deg, var(--green), transparent); }
+.metric-icon { font-size: 20px; margin-bottom: 10px; display: block; }
+.metric-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--txt-muted); font-weight: 600; margin-bottom: 6px; }
+.metric-value { font-family: var(--font-head); font-size: 28px; font-weight: 800; line-height: 1; margin-bottom: 5px; }
+.metric-value.gold { color: var(--gold); } .metric-value.teal { color: var(--teal); } .metric-value.red { color: var(--red); } .metric-value.green { color: var(--green); }
+.metric-target { font-size: 11.5px; color: var(--txt-muted); }
+
+.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.data-table th { text-align: left; padding: 9px 13px; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--txt-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table td { padding: 11px 13px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--txt-sec); }
+.data-table tr:hover td { background: rgba(255,255,255,0.03); color: var(--txt-pri); }
+.data-table tr:last-child td { border-bottom: none; }
+.table-scroll { overflow-x: auto; }
+
+.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+.status-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.status-received { background: rgba(59,130,246,0.12); color: var(--blue); }
+.status-verification { background: rgba(240,165,0,0.1); color: var(--gold); }
+.status-acknowledged { background: rgba(34,197,94,0.1); color: var(--green); }
+.status-released { background: rgba(0,201,177,0.12); color: var(--teal); }
+.status-withdrawn { background: var(--red-dim); color: var(--red); }
+.cat-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.cat-agency { background: rgba(59,130,246,0.15); color: var(--blue); }
+.cat-public { background: var(--gold-dim); color: var(--gold); }
+
+.alert { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px; border-radius: 8px; margin-bottom: 10px; font-size: 12.5px; }
+.alert:last-child { margin-bottom: 0; }
+.alert-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.alert-content strong { display: block; font-weight: 700; margin-bottom: 2px; font-size: 13px; }
+.alert-content span { color: var(--txt-muted); font-size: 11.5px; line-height: 1.5; }
+.alert-critical { background: var(--red-dim); border: 1px solid rgba(232,57,74,0.2); color: #FDA5AD; }
+.alert-warning { background: var(--gold-dim); border: 1px solid rgba(240,165,0,0.2); color: #FCD27A; }
+.alert-info { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #93C5FD; }
+.alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: #86EFAC; }
+
+.form-group { margin-bottom: 15px; }
+.form-label { display: block; font-size: 10.5px; font-weight: 700; color: var(--txt-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.form-label .req { color: var(--red); }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 10px 13px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--txt-pri); font-family: var(--font-body); font-size: 13.5px; transition: border-color 0.2s, background 0.2s; outline: none; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--gold); background: rgba(240,165,0,0.04); }
+.form-select option { background: var(--navy-mid); color: var(--txt-pri); }
+.form-textarea { resize: vertical; }
+.form-hint { font-size: 11px; color: var(--txt-muted); margin-top: 5px; }
+
+.filter-bar { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+.filter-chip { padding: 6px 13px; border-radius: 20px; font-size: 11.5px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); color: var(--txt-sec); background: transparent; transition: all 0.15s; font-family: var(--font-body); }
+.filter-chip:hover { border-color: rgba(240,165,0,0.4); color: var(--gold); }
+.filter-chip.active { background: var(--gold-dim); border-color: var(--border-gold); color: var(--gold); font-weight: 600; }
+
+.chart-wrap { position: relative; width: 100%; }
+
+.modal-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--navy-card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.6); animation: modalIn 0.25s ease; }
+.modal.narrow { max-width: 460px; }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.modal-title { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+.modal-close { background: none; border: none; color: var(--txt-muted); font-size: 18px; cursor: pointer; padding: 4px; }
+.modal-close:hover { color: var(--txt-pri); }
+.modal-success { text-align: center; padding: 10px 0; }
+.modal-success .check { font-size: 40px; margin-bottom: 14px; }
+.modal-success h3 { font-family: var(--font-head); font-size: 18px; font-weight: 700; margin-bottom: 10px; color: var(--teal); }
+.modal-success p { font-size: 13px; color: var(--txt-sec); line-height: 1.6; }
+
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); gap: 14px; }
+.setting-row:last-child { border-bottom: none; }
+.setting-info .setting-label { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
+.setting-info .setting-desc { font-size: 11.5px; color: var(--txt-muted); }
+.toggle { width: 40px; height: 22px; border-radius: 11px; background: rgba(255,255,255,0.12); cursor: pointer; position: relative; transition: background 0.2s; border: none; flex-shrink: 0; }
+.toggle.on { background: var(--gold); }
+.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+.toggle.on::after { transform: translateX(18px); }
+
+.audit-item { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12.5px; }
+.audit-item:last-child { border-bottom: none; }
+.audit-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.audit-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--txt-muted); white-space: nowrap; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+#offline-banner { display: none; position: fixed; bottom: 16px; right: 16px; z-index: 999; background: var(--gold); color: var(--navy); padding: 10px 16px; border-radius: 8px; font-size: 12.5px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+#save-toast { display: none; position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 999; background: var(--navy-card); border: 1px solid var(--border-gold); color: var(--gold); padding: 10px 18px; border-radius: 8px; font-size: 12.5px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+@media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 900px) {
+  :root { --sidebar-w: 0px; }
+  #sidebar { transform: translateX(-268px); width: 268px; }
+  #sidebar.open { transform: translateX(0); }
+  #hamburger { display: flex; }
+  #main { margin-left: 0; }
+  #topbar { padding-left: 60px; }
+  .grid-2-1 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: repeat(2,1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .page { padding: 16px; }
+}
+@media (max-width: 600px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } #topbar { padding: 0 16px 0 58px; } }
+@media print { #sidebar, #topbar, #hamburger { display: none !important; } #main { margin: 0; } .page.active { padding: 0; } body { background: #fff; color: #000; } }
+</style>
+</head>
+<body>
+
+<div id="prototype-banner">⚠ Prototype / Design Concept — Not Yet an Official Hosted Government System — For Internal DPM / TWT Review Only</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-bg"></div>
+  <div class="login-grid"></div>
+  <div class="login-box">
+    <div class="login-emblem">
+      <div class="emblem-seal">🦅</div>
+      <div class="emblem-text">
+        <div class="country">Independent State of Papua New Guinea</div>
+        <div class="system-name">Resigning Officers Register — NGE 2027</div>
+        <div class="system-sub">Department of Personnel Management · v0.1 Prototype</div>
+      </div>
+    </div>
+    <div class="login-divider"></div>
+    <div class="login-title" id="login-mode-title">DPM Secure Sign-In</div>
+    <div class="login-sub">Register and verify Public Servants &amp; Agency Heads resigning to contest the 2027 National General Election. Authorized officers only — all access is logged.</div>
+    <div id="login-error" class="login-error">⚠ Something's not right — check the message below.</div>
+    <div class="l-form-group" id="signup-name-group" style="display:none;">
+      <label class="l-form-label">Full Name</label>
+      <input class="l-form-input" type="text" id="login-name" placeholder="e.g. Mathson Rams" autocomplete="name">
+    </div>
+    <div class="l-form-group">
+      <label class="l-form-label">Work Email</label>
+      <input class="l-form-input" type="email" id="login-user" placeholder="e.g. m.rams@dpm.gov.pg" autocomplete="username">
+    </div>
+    <div class="l-form-group">
+      <label class="l-form-label">Password</label>
+      <input class="l-form-input" type="password" id="login-pass" placeholder="Enter your password" autocomplete="current-password">
+    </div>
+    <div id="signup-hint" class="form-hint" style="display:none;margin-bottom:14px;">New accounts start as a Read-only Viewer. An Administrator can raise your access level under "Manage Users" once you're signed in.</div>
+    <button class="login-btn" id="login-submit-btn" onclick="doLogin()">🔐 &nbsp;Sign In to the Register</button>
+    <div class="login-notice">
+      <span id="login-toggle-text">Need an account? <a href="#" onclick="toggleAuthMode();return false;">Create one</a></span> ·
+      By continuing you agree to the <a href="#" onclick="return false;">PNG Government ICT Policy</a> and <a href="#" onclick="return false;">Data Protection Act 2021</a>. In production this step would also enforce two-factor authentication (2FA).
+    </div>
+  </div>
+  <div class="login-footer">DPM Resigning Officers Register &nbsp;|&nbsp; Reforms &amp; Policy Branch &nbsp;|&nbsp; NGE 2027 &nbsp;|&nbsp; <span id="login-year"></span></div>
+</div>
+
+<div id="offline-banner">⚡ You are offline — changes will sync when reconnected</div>
+<div id="save-toast">✓ Saved</div>
+
+<button id="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+
+<div id="app">
+  <nav id="sidebar" role="navigation" aria-label="Main navigation">
+    <div class="sb-header">
+      <div class="sb-logo-row">
+        <div class="sb-seal">🦅</div>
+        <div class="sb-text">
+          <div class="sb-badge">PNG · DPM</div>
+          <div class="sb-title">NGE 2027 Register</div>
+          <div class="sb-version">v0.1 · Prototype</div>
+        </div>
+      </div>
+      <div class="sb-user-pill">
+        <div class="sb-avatar" id="sb-avatar">MR</div>
+        <div class="sb-user-info">
+          <div class="sb-user-name" id="sb-user-name">Loading…</div>
+          <div class="sb-user-role" id="sb-user-role">Administrator</div>
+        </div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <div class="nav-section">Main</div>
+      <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="navigate('newreg')" id="nav-newreg"><span class="nav-icon">➕</span> New Registration</div>
+      <div class="nav-section">Registers</div>
+      <div class="nav-item" onclick="navigate('agencyheads')" id="nav-agencyheads"><span class="nav-icon">🏛️</span> Agency Heads Register</div>
+      <div class="nav-item" onclick="navigate('publicservants')" id="nav-publicservants"><span class="nav-icon">👥</span> Public Servants Register</div>
+      <div class="nav-item" onclick="navigate('allrecords')" id="nav-allrecords"><span class="nav-icon">📋</span> Combined Register</div>
+      <div class="nav-section">Committee Review</div>
+      <div class="nav-item" onclick="navigate('feedback')" id="nav-feedback"><span class="nav-icon">💬</span> Give Feedback <span class="nav-badge" id="fb-badge" style="display:none;"></span></div>
+      <div class="nav-section">System</div>
+      <div class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none;"><span class="nav-icon">🧑‍💼</span> Manage Users</div>
+      <div class="nav-item" onclick="navigate('auditlog')" id="nav-auditlog"><span class="nav-icon">🕓</span> Audit Log</div>
+      <div class="nav-item" onclick="navigate('security')" id="nav-security"><span class="nav-icon">🔒</span> Security &amp; Safeguards</div>
+      <div class="nav-item" onclick="navigate('about')" id="nav-about"><span class="nav-icon">ℹ️</span> About This Prototype</div>
+    </div>
+    <div class="sb-footer">
+      <div class="sb-status-row"><span class="live-dot"></span><span class="sb-status-txt" id="sync-status">Synced — data store live</span></div>
+      <button class="sb-logout" onclick="doLogout()">↩ &nbsp;Sign Out</button>
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="tb-title" id="tb-title">Dashboard</div>
+      <div class="tb-date" id="tb-date"></div>
+      <div class="tb-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-gold btn-sm" onclick="navigate('newreg')">➕ New Registration</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h2>Resignation Register Dashboard</h2>
+        <p>Live summary of Public Servants &amp; Agency Heads who have submitted resignation letters to contest the 2027 National General Election.</p>
+      </div>
+      <div class="grid-4">
+        <div class="metric-card gold"><span class="metric-icon">📋</span><div class="metric-label">Total Registered</div><div class="metric-value gold" id="m-total">0</div><div class="metric-target">Agency Heads + Public Servants</div></div>
+        <div class="metric-card blue"><span class="metric-icon">🏛️</span><div class="metric-label">Agency Heads</div><div class="metric-value" style="color:var(--blue)" id="m-agency">0</div><div class="metric-target">Provincial admins, CEOs, etc.</div></div>
+        <div class="metric-card teal"><span class="metric-icon">✅</span><div class="metric-label">Acknowledged</div><div class="metric-value teal" id="m-ack">0</div><div class="metric-target">DPM acknowledgement issued</div></div>
+        <div class="metric-card red"><span class="metric-icon">⏳</span><div class="metric-label">Pending Verification</div><div class="metric-value red" id="m-pending">0</div><div class="metric-target">Awaiting DPM / PNGEC check</div></div>
+      </div>
+      <div class="grid-2-1">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Registrations by Status</span></div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">By Category</span></div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="catChart"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Registrations by Province</span></div>
+          <div class="chart-wrap" style="height:230px;"><canvas id="provinceChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Activity</span><span class="card-action" onclick="navigate('auditlog')">View full log →</span></div>
+          <div id="dash-audit"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-header"><span class="card-title">Notices</span></div>
+        <div class="alert alert-info"><span class="alert-icon">ℹ️</span><div class="alert-content"><strong>This is a working, shared prototype</strong><span>Records, status changes and committee feedback are saved to a real shared data store — everyone who opens this link sees the same live register. Seeded entries are sample data only. For operational use with real officers' records, this still needs a DPM-approved hosted database and real authentication — see "About This Prototype".</span></div></div>
+      </div>
+    </div>
+
+    <!-- NEW REGISTRATION -->
+    <div class="page" id="page-newreg">
+      <div class="page-header">
+        <h2>New Registration</h2>
+        <p>Enter a resignation record exactly as received. All 15 fields mirror the official DPM Secretariat Data Entry Matrix.</p>
+      </div>
+      <div class="card" style="max-width:900px;">
+        <form id="reg-form" onsubmit="return false;">
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Category <span class="req">*</span></label>
+              <select class="form-select" id="f-category">
+                <option value="Agency Head">Agency Head</option>
+                <option value="Public Servant">Public Servant</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name of Officer <span class="req">*</span></label>
+              <input class="form-input" id="f-name" placeholder="e.g. Richard Otmar Andia, BCOM">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Designation / Position</label>
+              <input class="form-input" id="f-designation" placeholder="e.g. Provincial Administrator">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Organization / Agency</label>
+              <input class="form-input" id="f-agency" placeholder="e.g. New Ireland Provincial Administration">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Specific Category of Institution / Organisation</label>
+              <input class="form-input" id="f-institution" placeholder="e.g. Office of the Provincial Administrator">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Province</label>
+              <select class="form-select" id="f-province">
+                <option value="">— Select —</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Electorate Contesting</label>
+              <input class="form-input" id="f-electorate" placeholder="e.g. Kavieng Open (To Be Confirmed)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Political Party Affiliation (if applicable)</label>
+              <input class="form-input" id="f-party" placeholder="TBA">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Date of Resignation (as stated in letter)</label>
+              <input class="form-input" type="date" id="f-resigndate">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date Received in DPM Sec's Office</label>
+              <input class="form-input" type="date" id="f-receiveddate">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Date of DPM Acknowledgement</label>
+              <input class="form-input" type="date" id="f-ackdate">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <select class="form-select" id="f-status">
+                <option value="Received">Received</option>
+                <option value="Under Verification">Under Verification</option>
+                <option value="Acknowledged">Acknowledged</option>
+                <option value="Released to PNGEC">Released to PNGEC</option>
+                <option value="Withdrawn">Withdrawn</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Contact Phone</label>
+              <input class="form-input" id="f-phone" placeholder="e.g. 984 2289">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contact Email</label>
+              <input class="form-input" type="email" id="f-email" placeholder="name@agency.gov.pg">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Subject / Details</label>
+            <input class="form-input" id="f-subject" placeholder="e.g. Letter of resignation effective 02nd September 2026">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Remarks</label>
+            <textarea class="form-textarea" id="f-remarks" rows="2" placeholder="TBA"></textarea>
+          </div>
+          <div class="form-hint" style="margin-bottom:14px;">Fields left blank are stored as "TBA", matching the current Excel matrices.</div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-gold" id="save-reg-btn" onclick="submitRegistration()">✅ Save Registration</button>
+            <button class="btn btn-ghost" onclick="clearRegForm()">Clear Form</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- AGENCY HEADS REGISTER -->
+    <div class="page" id="page-agencyheads">
+      <div class="page-header"><h2>Register for Agency Heads Registration to Contest NGE 2027</h2><p>Provincial Administrators, CEOs of Provincial Health/Statutory Authorities and other agency heads.</p></div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="ah-count">0 records</span>
+          <input class="form-input" style="width:220px;font-size:12px;padding:6px 11px;" placeholder="Search…" oninput="renderRegisters()" id="ah-search">
+        </div>
+        <div class="table-scroll"><table class="data-table" id="ah-table"><thead><tr><th>No</th><th>Name</th><th>Designation</th><th>Agency</th><th>Province</th><th>Electorate</th><th>Resigned</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PUBLIC SERVANTS REGISTER -->
+    <div class="page" id="page-publicservants">
+      <div class="page-header"><h2>Register for Public Servants Registration to Contest NGE 2027</h2><p>General register for all other public servants resigning to contest the election.</p></div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="ps-count">0 records</span>
+          <input class="form-input" style="width:220px;font-size:12px;padding:6px 11px;" placeholder="Search…" oninput="renderRegisters()" id="ps-search">
+        </div>
+        <div class="table-scroll"><table class="data-table" id="ps-table"><thead><tr><th>No</th><th>Name</th><th>Designation</th><th>Agency</th><th>Province</th><th>Electorate</th><th>Resigned</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- COMBINED REGISTER -->
+    <div class="page" id="page-allrecords">
+      <div class="page-header"><h2>Combined Register</h2><p>Both registers in one view, with filters by category, province and status.</p></div>
+      <div class="filter-bar" id="all-filter-cat">
+        <span class="filter-chip active" data-v="All" onclick="setFilter('cat',this)">All Categories</span>
+        <span class="filter-chip" data-v="Agency Head" onclick="setFilter('cat',this)">Agency Heads</span>
+        <span class="filter-chip" data-v="Public Servant" onclick="setFilter('cat',this)">Public Servants</span>
+      </div>
+      <div class="filter-bar" id="all-filter-status">
+        <span class="filter-chip active" data-v="All" onclick="setFilter('status',this)">All Statuses</span>
+        <span class="filter-chip" data-v="Received" onclick="setFilter('status',this)">Received</span>
+        <span class="filter-chip" data-v="Under Verification" onclick="setFilter('status',this)">Under Verification</span>
+        <span class="filter-chip" data-v="Acknowledged" onclick="setFilter('status',this)">Acknowledged</span>
+        <span class="filter-chip" data-v="Released to PNGEC" onclick="setFilter('status',this)">Released to PNGEC</span>
+        <span class="filter-chip" data-v="Withdrawn" onclick="setFilter('status',this)">Withdrawn</span>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="all-count">0 records</span>
+          <input class="form-input" style="width:220px;font-size:12px;padding:6px 11px;" placeholder="Search…" oninput="renderRegisters()" id="all-search">
+        </div>
+        <div class="table-scroll"><table class="data-table" id="all-table"><thead><tr><th>No</th><th>Cat.</th><th>Name</th><th>Designation</th><th>Province</th><th>Electorate</th><th>Status</th><th>Entered By</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- FEEDBACK -->
+    <div class="page" id="page-feedback">
+      <div class="page-header"><h2>Give Feedback</h2><p>Committee comments on this prototype — what works, what's missing, what should change before it goes to production. Visible to everyone reviewing this link, so you can see each other's suggestions.</p></div>
+      <div class="card" style="max-width:700px;">
+        <div class="form-group">
+          <label class="form-label">Your Name / Role</label>
+          <input class="form-input" id="fb-name" placeholder="e.g. Ellison Kalimat, Deputy Secretary">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Comment</label>
+          <textarea class="form-textarea" id="fb-text" rows="3" placeholder="What would you like to see changed or added?"></textarea>
+        </div>
+        <button class="btn btn-gold" id="fb-submit-btn" onclick="submitFeedback()">💬 Submit Comment</button>
+      </div>
+      <div class="card" style="margin-top:14px;max-width:700px;">
+        <div class="card-header"><span class="card-title" id="fb-count">0 comments</span></div>
+        <div id="fb-list"></div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOG -->
+    <div class="page" id="page-auditlog">
+      <div class="page-header"><h2>Audit Log</h2><p>Every create, update and delete action in this session, with the signed-in officer and a timestamp — required for accountability under Section 5.3 of the DBMS design.</p></div>
+      <div class="card"><div id="audit-full"></div></div>
+    </div>
+
+    <!-- MANAGE USERS (Administrator only) -->
+    <div class="page" id="page-users">
+      <div class="page-header"><h2>Manage Users</h2><p>Every officer who has created an account, and the access role currently assigned to them. Only an Administrator can change a role.</p></div>
+      <div class="card">
+        <div class="table-scroll"><table class="data-table" id="users-table"><thead><tr><th>Name</th><th>Role</th><th>Joined</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- SECURITY -->
+    <div class="page" id="page-security">
+      <div class="page-header"><h2>Security &amp; Safeguards</h2><p>Configuration this system is designed around, mapped to the three risk areas raised for this project.</p></div>
+      <div class="grid-3">
+        <div class="card"><div class="card-header"><span class="card-title">1. Data Privacy</span></div><p style="font-size:12.5px;color:var(--txt-sec);line-height:1.6;">Compliance with public service and electoral law. Only fields required for verification are collected; a retention/disposal rule removes candidate data no longer needed after NGE 2027 in line with DPM records policy.</p></div>
+        <div class="card"><div class="card-header"><span class="card-title">2. Unauthorized Access</span></div><p style="font-size:12.5px;color:var(--txt-sec);line-height:1.6;">Role-based sign-in (Administrator / Data Entry / Verifying / Viewer) is enforced at login. In production this is backed by two-factor authentication (2FA) and encryption of data at rest and in transit.</p></div>
+        <div class="card"><div class="card-header"><span class="card-title">3. System Reliability</span></div><p style="font-size:12.5px;color:var(--txt-sec);line-height:1.6;">Records save automatically as you work. A production deployment adds scheduled backups, a tested disaster-recovery restore procedure, and an offline export as fallback.</p></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-header"><span class="card-title">Role Permissions (this prototype)</span></div>
+        <div class="table-scroll"><table class="data-table"><thead><tr><th>Role</th><th>View Registers</th><th>Add Record</th><th>Edit Status</th><th>Delete Record</th></tr></thead><tbody>
+          <tr><td>Administrator</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+          <tr><td>Data Entry Officer</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>Verifying Officer</td><td>✅</td><td>—</td><td>✅</td><td>—</td></tr>
+          <tr><td>Read-only Viewer</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody></table></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-header"><span class="card-title">Security Toggles (illustrative)</span></div>
+        <div class="setting-row"><div class="setting-info"><div class="setting-label">Two-Factor Authentication (2FA)</div><div class="setting-desc">Requires a second verification step at sign-in. Not enforceable in a static prototype — flagged for the production build.</div></div><button class="toggle" id="t-2fa" onclick="this.classList.toggle('on')"></button></div>
+        <div class="setting-row"><div class="setting-info"><div class="setting-label">Encryption at Rest &amp; in Transit</div><div class="setting-desc">Requires a managed database and HTTPS hosting — configured at deployment, not in the front end.</div></div><button class="toggle on" id="t-enc" onclick="this.classList.toggle('on')"></button></div>
+        <div class="setting-row"><div class="setting-info"><div class="setting-label">Scheduled Backups</div><div class="setting-desc">Nightly export of the register to a secure store, with a tested restore procedure.</div></div><button class="toggle on" id="t-bak" onclick="this.classList.toggle('on')"></button></div>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div class="page" id="page-about">
+      <div class="page-header"><h2>About This Prototype</h2><p>What this file is, what it already does, and what turning it into a real production system for DPM still requires.</p></div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">What this is</span></div>
+        <p style="font-size:13px;color:var(--txt-sec);line-height:1.7;">A self-contained web app built to the same visual system as the DRBMS prototype, implementing the Data Entry Matrix (Agency Heads Register, Public Servants Register) and the Step-by-Step Framework already approved for this project. When published as a Claude artifact it is backed by a real shared, persistent data store — everyone who opens this link sees the same live register, the same audit log and the same committee feedback, and records survive between visits. That is the "backend" this prototype now runs on.</p>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-header"><span class="card-title">What kind of backend this is — and isn't</span></div>
+        <p style="font-size:13px;color:var(--txt-sec);line-height:1.7;margin-bottom:10px;">This is Claude's built-in artifact storage, not the department's own database. It is genuinely shared and persistent, which makes it good for this stage — committee review, layout and workflow feedback. It is not yet the production system described in the DBMS proposal:</p>
+        <ul style="font-size:13px;color:var(--txt-sec);line-height:1.9;padding-left:18px;">
+          <li>Data lives inside Claude's platform, not on a DPM-owned or DPM-approved server — EM MIS should confirm whether that is acceptable for public-service resignation records even at review stage.</li>
+          <li>The published link is public and unauthenticated by default — anyone with the URL can open it. There is no password, no expiry, and no way to restrict it to committee members only, unless DPM's Claude plan is Team/Enterprise (which allows organization-only sharing instead of a public link).</li>
+          <li>Sign-in on this page is a role-selector for demonstration, not real authentication — it does not enforce 2FA or verify identity.</li>
+          <li>Moving to production still means what Section 5–7 of the DBMS proposal covers: a Vertabelo/DbSchema-modelled database on a DPM-approved host, real authentication with 2FA, and the HRIS/PNGEC integrations.</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-header"><span class="card-title">Data in this version</span></div>
+        <p style="font-size:13px;color:var(--txt-sec);line-height:1.7;">The two seeded entries are clearly-labelled sample data, not real officers' records — real names, phone numbers and emails have been left out of this shareable version deliberately, since the link is public. Once EM MIS confirms hosting and access control, real entries can be loaded before this goes into operational use.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RECORD DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Record Detail</span><button class="modal-close" onclick="closeModal('detailModal')">✕</button></div>
+    <div id="detail-body" style="font-size:13px;color:var(--txt-sec);line-height:1.8;"></div>
+  </div>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal narrow">
+    <div class="modal-success">
+      <div class="check">✅</div>
+      <h3>Registration Saved</h3>
+      <p id="success-text">The record has been added to the register.</p>
+      <button class="btn btn-gold" style="margin-top:18px;" onclick="closeModal('successModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// SUPABASE CLIENT — replace these two values with your project's own
+// (Project Settings → API in the Supabase dashboard). The anon key is
+// safe to expose here; row-level security in schema.sql controls access.
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://utupwjbjjlwsobeihnog.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_JrbbxMWnA-iRR417hN58GA_qO6dhA9z';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const PROVINCES = ['Central','Chimbu (Simbu)','Eastern Highlands','East New Britain','East Sepik','Enga','Gulf','Hela','Jiwaka','Madang','Manus','Milne Bay','Morobe','National Capital District','New Ireland','Northern (Oro)','Bougainville','Southern Highlands','Western (Fly)','Western Highlands','West New Britain','West Sepik (Sandaun)'];
+
+let records = [];
+let auditLog = [];
+let feedback = [];
+let allUsers = [];
+let currentUser = { id: null, name: '', role: 'Read-only Viewer' };
+let filters = { cat: 'All', status: 'All' };
+let realtimeChannel = null;
+
+// ═══════════════════════════════════════════
+// DATA LOADING (Supabase Postgres, shared across every signed-in officer)
+// ═══════════════════════════════════════════
+async function loadData() {
+  const [{ data: recData, error: recErr }, { data: auditData, error: auditErr }, { data: fbData, error: fbErr }] = await Promise.all([
+    supabase.from('resignation_records').select('*').order('created_at', { ascending: false }),
+    supabase.from('audit_log').select('*').order('ts', { ascending: false }).limit(300),
+    supabase.from('feedback').select('*').order('created_at', { ascending: false })
+  ]);
+  if (recErr || auditErr || fbErr) {
+    console.error('Load error:', recErr || auditErr || fbErr);
+    document.getElementById('sync-status').textContent = 'Connection error — check console';
+    return;
+  }
+  records = (recData || []).map(fromDbRecord);
+  auditLog = (auditData || []).map(a => ({ action: a.action, detail: a.detail, user: a.user_name, role: a.role, ts: a.ts }));
+  feedback = (fbData || []).map(f => ({ name: f.name, text: f.comment, role: f.role, ts: f.created_at }));
+  document.getElementById('sync-status').textContent = 'Synced — shared department register';
+  subscribeRealtime();
+}
+
+// Convert a DB row (snake_case) to the shape the rest of the UI expects
+function fromDbRecord(r) {
+  return {
+    id: r.id, category: r.category, name: r.name, designation: r.designation, agency: r.agency,
+    institution: r.institution, province: r.province, electorate: r.electorate, party: r.party,
+    resigndate: r.resign_date, receiveddate: r.received_date, ackdate: r.ack_date,
+    phone: r.phone, email: r.email, subject: r.subject, status: r.status, remarks: r.remarks,
+    enteredBy: r.entered_by_name, ts: r.created_at
+  };
+}
+
+// Live updates: if a colleague adds/changes/removes a record elsewhere,
+// everyone's screen refreshes automatically.
+function subscribeRealtime() {
+  if (realtimeChannel) return;
+  realtimeChannel = supabase.channel('nge2027-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'resignation_records' }, async () => { await refreshRecordsOnly(); renderAll(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, async () => { await refreshAuditOnly(); renderAuditFull(); renderDashAudit(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, async () => { await refreshFeedbackOnly(); renderFeedback(); })
+    .subscribe();
+}
+async function refreshRecordsOnly() {
+  const { data } = await supabase.from('resignation_records').select('*').order('created_at', { ascending: false });
+  records = (data || []).map(fromDbRecord);
+}
+async function refreshAuditOnly() {
+  const { data } = await supabase.from('audit_log').select('*').order('ts', { ascending: false }).limit(300);
+  auditLog = (data || []).map(a => ({ action: a.action, detail: a.detail, user: a.user_name, role: a.role, ts: a.ts }));
+}
+async function refreshFeedbackOnly() {
+  const { data } = await supabase.from('feedback').select('*').order('created_at', { ascending: false });
+  feedback = (data || []).map(f => ({ name: f.name, text: f.comment, role: f.role, ts: f.created_at }));
+}
+
+async function submitFeedback() {
+  const name = document.getElementById('fb-name').value.trim() || currentUser.name || 'Anonymous';
+  const text = document.getElementById('fb-text').value.trim();
+  if (!text) { alert('Please write a comment first.'); return; }
+  const { error } = await supabase.from('feedback').insert({ name, role: currentUser.role, comment: text });
+  if (error) { alert('Could not save your comment: ' + error.message); return; }
+  document.getElementById('fb-text').value = '';
+  await logAudit('Feedback', `${name} left a comment on the prototype`);
+  await refreshFeedbackOnly();
+  showToast();
+  renderFeedback();
+}
+
+function renderFeedback() {
+  document.getElementById('fb-count').textContent = feedback.length + ' comment' + (feedback.length === 1 ? '' : 's');
+  document.getElementById('fb-list').innerHTML = feedback.map(f => `
+    <div class="audit-item"><span class="audit-dot" style="background:var(--gold)"></span>
+    <div style="flex:1;"><div style="font-size:13px;color:var(--txt-pri);"><strong>${f.name}</strong> <span style="color:var(--txt-muted);font-size:11px;">(${f.role})</span></div>
+    <div style="font-size:12.5px;margin:3px 0;">${f.text}</div><div class="audit-time">${new Date(f.ts).toLocaleString()}</div></div></div>`).join('') || '<p style="color:var(--txt-muted);font-size:12.5px;">No comments yet — be the first to leave feedback.</p>';
+  const badge = document.getElementById('fb-badge');
+  if (feedback.length > 0) { badge.style.display = 'inline-block'; badge.textContent = feedback.length; } else { badge.style.display = 'none'; }
+}
+
+function showToast() {
+  const t = document.getElementById('save-toast');
+  t.style.display = 'block';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.style.display = 'none', 1400);
+}
+
+async function logAudit(action, detail) {
+  const { error } = await supabase.from('audit_log').insert({
+    action, detail, user_id: currentUser.id, user_name: currentUser.name || 'Unknown', role: currentUser.role
+  });
+  if (error) console.error('Audit log error:', error);
+}
+
+// ═══════════════════════════════════════════
+// AUTH (real Supabase Auth — email + password)
+// ═══════════════════════════════════════════
+let authMode = 'signin'; // 'signin' | 'signup'
+function toggleAuthMode() {
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  const isSignup = authMode === 'signup';
+  document.getElementById('signup-name-group').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('signup-hint').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('login-mode-title').textContent = isSignup ? 'Create Your DPM Account' : 'DPM Secure Sign-In';
+  document.getElementById('login-submit-btn').textContent = isSignup ? '📝  Create Account' : '🔐  Sign In to the Register';
+  document.getElementById('login-submit-btn').setAttribute('onclick', isSignup ? 'doSignup()' : 'doLogin()');
+  document.getElementById('login-toggle-text').innerHTML = isSignup
+    ? `Already have an account? <a href="#" onclick="toggleAuthMode();return false;">Sign in</a>`
+    : `Need an account? <a href="#" onclick="toggleAuthMode();return false;">Create one</a>`;
+  document.getElementById('login-error').style.display = 'none';
+}
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+async function doSignup() {
+  const fullName = document.getElementById('login-name').value.trim();
+  const email = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!fullName || !email || !password) { showLoginError('Please fill in your name, email and a password.'); return; }
+  if (password.length < 6) { showLoginError('Password must be at least 6 characters.'); return; }
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+  if (error) { showLoginError(error.message); return; }
+  document.getElementById('login-error').style.display = 'none';
+  if (!data.session) {
+    // Email confirmation is turned on in this Supabase project
+    alert('Account created. Check your email to confirm it, then sign in.');
+    toggleAuthMode();
+    return;
+  }
+  await afterSignIn();
+}
+async function doLogin() {
+  const email = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!email || !password) { showLoginError('Please enter your email and password.'); return; }
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) { showLoginError(error.message); return; }
+  document.getElementById('login-error').style.display = 'none';
+  await afterSignIn();
+}
+async function afterSignIn() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) { showLoginError('Sign-in succeeded but no session was returned — please try again.'); return; }
+  const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (profileErr || !profile) { showLoginError('Signed in, but your profile could not be loaded: ' + (profileErr ? profileErr.message : 'not found')); return; }
+  currentUser = { id: user.id, name: profile.full_name, role: profile.role };
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('sb-user-name').textContent = currentUser.name;
+  document.getElementById('sb-user-role').textContent = currentUser.role;
+  document.getElementById('sb-avatar').textContent = currentUser.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+  applyRolePermissions();
+  await loadData();
+  await logAudit('Sign in', `${currentUser.name} signed in as ${currentUser.role}`);
+  await refreshAuditOnly();
+  populateProvinceSelect();
+  renderAll();
+}
+async function doLogout() {
+  await logAudit('Sign out', `${currentUser.name} signed out`);
+  if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
+  await supabase.auth.signOut();
+  currentUser = { id: null, name: '', role: 'Read-only Viewer' };
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display = 'flex';
+}
+function applyRolePermissions() {
+  const canAdd = currentUser.role !== 'Read-only Viewer';
+  document.getElementById('nav-newreg').style.display = canAdd ? 'flex' : 'none';
+  document.getElementById('nav-users').style.display = currentUser.role === 'Administrator' ? 'flex' : 'none';
+}
+
+// Returning visitor with a still-valid Supabase session: skip the login screen
+async function restoreSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) { await afterSignIn(); }
+}
+
+// ═══════════════════════════════════════════
+// MANAGE USERS (Administrator only)
+// ═══════════════════════════════════════════
+async function renderUsers() {
+  const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: true });
+  if (error) { console.error(error); return; }
+  allUsers = data || [];
+  const roleOpts = ['Administrator','Data Entry Officer','Verifying Officer','Read-only Viewer'];
+  document.getElementById('users-table').querySelector('tbody').innerHTML = allUsers.map(u => `
+    <tr><td>${u.full_name}${u.id === currentUser.id ? ' <span style="color:var(--txt-muted);font-size:11px;">(you)</span>' : ''}</td>
+    <td><select class="form-select" style="padding:4px 8px;font-size:11px;" onchange="changeUserRole('${u.id}',this.value)">
+      ${roleOpts.map(r => `<option value="${r}" ${r===u.role?'selected':''}>${r}</option>`).join('')}
+    </select></td>
+    <td>${fmtDate(u.created_at)}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--txt-muted);">No users yet</td></tr>';
+}
+async function changeUserRole(userId, newRole) {
+  const target = allUsers.find(u => u.id === userId);
+  const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+  if (error) { alert('Could not update role: ' + error.message); renderUsers(); return; }
+  await logAudit('Update', `${currentUser.name} set ${target ? target.full_name : userId}'s role to "${newRole}"`);
+  await refreshAuditOnly();
+  renderUsers();
+}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+const PAGE_TITLES = { dashboard:'Dashboard', newreg:'New Registration', agencyheads:'Agency Heads Register', publicservants:'Public Servants Register', allrecords:'Combined Register', feedback:'Committee Feedback', auditlog:'Audit Log', users:'Manage Users', security:'Security & Safeguards', about:'About This Prototype' };
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page).classList.add('active');
+  document.getElementById('tb-title').textContent = PAGE_TITLES[page];
+  if (window.innerWidth <= 900) document.getElementById('sidebar').classList.remove('open');
+  if (page === 'agencyheads' || page === 'publicservants' || page === 'allrecords') renderRegisters();
+  if (page === 'auditlog') renderAuditFull();
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'feedback') renderFeedback();
+  if (page === 'users') renderUsers();
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ═══════════════════════════════════════════
+// FORM
+// ═══════════════════════════════════════════
+function populateProvinceSelect() {
+  const sel = document.getElementById('f-province');
+  PROVINCES.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); });
+}
+function clearRegForm() {
+  ['f-name','f-designation','f-agency','f-institution','f-electorate','f-party','f-resigndate','f-receiveddate','f-ackdate','f-phone','f-email','f-subject','f-remarks'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-province').value = '';
+  document.getElementById('f-category').value = 'Agency Head';
+  document.getElementById('f-status').value = 'Received';
+}
+async function submitRegistration() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert("Please enter the officer's name."); return; }
+  const val = id => document.getElementById(id).value.trim() || 'TBA';
+  const rec = {
+    category: document.getElementById('f-category').value,
+    name,
+    designation: val('f-designation'),
+    agency: val('f-agency'),
+    institution: val('f-institution'),
+    province: document.getElementById('f-province').value || 'TBA',
+    electorate: val('f-electorate'),
+    party: val('f-party'),
+    resign_date: document.getElementById('f-resigndate').value || null,
+    received_date: document.getElementById('f-receiveddate').value || null,
+    ack_date: document.getElementById('f-ackdate').value || null,
+    phone: document.getElementById('f-phone').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    subject: val('f-subject'),
+    status: document.getElementById('f-status').value,
+    remarks: document.getElementById('f-remarks').value.trim() || 'TBA',
+    entered_by: currentUser.id,
+    entered_by_name: currentUser.name
+  };
+  const { error } = await supabase.from('resignation_records').insert(rec);
+  if (error) { alert('Could not save this registration: ' + error.message); return; }
+  await logAudit('Create', `${currentUser.name} registered ${rec.name} (${rec.category})`);
+  await refreshRecordsOnly();
+  await refreshAuditOnly();
+  showToast();
+  document.getElementById('success-text').textContent = `${rec.name} has been added to the ${rec.category === 'Agency Head' ? 'Agency Heads' : 'Public Servants'} Register.`;
+  openModal('successModal');
+  clearRegForm();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════
+// STATUS / DELETE
+// ═══════════════════════════════════════════
+async function changeStatus(id, newStatus) {
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  const old = rec.status;
+  const { error } = await supabase.from('resignation_records').update({ status: newStatus }).eq('id', id);
+  if (error) { alert('Could not update status: ' + error.message); return; }
+  await logAudit('Update', `${currentUser.name} changed status of ${rec.name} from "${old}" to "${newStatus}"`);
+  await refreshRecordsOnly();
+  await refreshAuditOnly();
+  showToast();
+  renderAll();
+}
+async function deleteRecord(id) {
+  if (currentUser.role !== 'Administrator') { alert('Only an Administrator can delete records.'); return; }
+  const rec = records.find(r => r.id === id);
+  if (!rec || !confirm(`Remove ${rec.name} from the register?`)) return;
+  const { error } = await supabase.from('resignation_records').delete().eq('id', id);
+  if (error) { alert('Could not delete this record: ' + error.message); return; }
+  await logAudit('Delete', `${currentUser.name} removed ${rec.name} from the register`);
+  await refreshRecordsOnly();
+  await refreshAuditOnly();
+  showToast();
+  renderAll();
+}
+function statusClass(s) {
+  return { 'Received':'status-received', 'Under Verification':'status-verification', 'Acknowledged':'status-acknowledged', 'Released to PNGEC':'status-released', 'Withdrawn':'status-withdrawn' }[s] || 'status-received';
+}
+function canEdit() { return currentUser.role === 'Administrator' || currentUser.role === 'Data Entry Officer' || currentUser.role === 'Verifying Officer'; }
+
+// ═══════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════
+function setFilter(kind, el) {
+  filters[kind] = el.dataset.v;
+  el.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderRegisters();
+}
+
+// ═══════════════════════════════════════════
+// RENDER TABLES
+// ═══════════════════════════════════════════
+function fmtDate(d) { if (!d) return 'TBA'; const dt = new Date(d); return isNaN(dt) ? d : dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }
+function statusOptions(current) {
+  return ['Received','Under Verification','Acknowledged','Released to PNGEC','Withdrawn'].map(s => `<option value="${s}" ${s===current?'selected':''}>${s}</option>`).join('');
+}
+function actionCell(r) {
+  let html = `<button class="btn btn-ghost btn-sm" onclick="showDetail(${r.id})">View</button>`;
+  if (currentUser.role === 'Administrator') html += ` <button class="btn btn-red btn-sm" onclick="deleteRecord(${r.id})">Delete</button>`;
+  return html;
+}
+function renderRegisters() {
+  // Agency Heads
+  const ahSearch = (document.getElementById('ah-search')?.value || '').toLowerCase();
+  const ah = records.filter(r => r.category === 'Agency Head' && (r.name.toLowerCase().includes(ahSearch) || r.agency.toLowerCase().includes(ahSearch) || r.province.toLowerCase().includes(ahSearch)));
+  document.getElementById('ah-count').textContent = ah.length + ' record' + (ah.length === 1 ? '' : 's');
+  document.getElementById('ah-table').querySelector('tbody').innerHTML = ah.map((r,i) => `
+    <tr><td>${i+1}</td><td>${r.name}</td><td>${r.designation}</td><td>${r.agency}</td><td>${r.province}</td><td>${r.electorate}</td><td>${fmtDate(r.resigndate)}</td>
+    <td>${canEdit() ? `<select class="form-select" style="padding:4px 8px;font-size:11px;" onchange="changeStatus(${r.id},this.value)">${statusOptions(r.status)}</select>` : `<span class="status-pill ${statusClass(r.status)}">${r.status}</span>`}</td>
+    <td>${actionCell(r)}</td></tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--txt-muted);">No records</td></tr>';
+
+  // Public Servants
+  const psSearch = (document.getElementById('ps-search')?.value || '').toLowerCase();
+  const ps = records.filter(r => r.category === 'Public Servant' && (r.name.toLowerCase().includes(psSearch) || r.agency.toLowerCase().includes(psSearch) || r.province.toLowerCase().includes(psSearch)));
+  document.getElementById('ps-count').textContent = ps.length + ' record' + (ps.length === 1 ? '' : 's');
+  document.getElementById('ps-table').querySelector('tbody').innerHTML = ps.map((r,i) => `
+    <tr><td>${i+1}</td><td>${r.name}</td><td>${r.designation}</td><td>${r.agency}</td><td>${r.province}</td><td>${r.electorate}</td><td>${fmtDate(r.resigndate)}</td>
+    <td>${canEdit() ? `<select class="form-select" style="padding:4px 8px;font-size:11px;" onchange="changeStatus(${r.id},this.value)">${statusOptions(r.status)}</select>` : `<span class="status-pill ${statusClass(r.status)}">${r.status}</span>`}</td>
+    <td>${actionCell(r)}</td></tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--txt-muted);">No records yet</td></tr>';
+
+  // Combined
+  const allSearch = (document.getElementById('all-search')?.value || '').toLowerCase();
+  let all = records.filter(r => (filters.cat === 'All' || r.category === filters.cat) && (filters.status === 'All' || r.status === filters.status) && (r.name.toLowerCase().includes(allSearch) || r.agency.toLowerCase().includes(allSearch) || r.province.toLowerCase().includes(allSearch)));
+  document.getElementById('all-count').textContent = all.length + ' record' + (all.length === 1 ? '' : 's');
+  document.getElementById('all-table').querySelector('tbody').innerHTML = all.map((r,i) => `
+    <tr><td>${i+1}</td><td><span class="cat-pill ${r.category==='Agency Head'?'cat-agency':'cat-public'}">${r.category==='Agency Head'?'Agency':'Public Svt'}</span></td><td>${r.name}</td><td>${r.designation}</td><td>${r.province}</td><td>${r.electorate}</td>
+    <td><span class="status-pill ${statusClass(r.status)}">${r.status}</span></td><td>${r.enteredBy}</td><td>${actionCell(r)}</td></tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--txt-muted);">No records match these filters</td></tr>';
+}
+
+function showDetail(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('detail-body').innerHTML = `
+    <p><strong style="color:var(--txt-pri)">${r.name}</strong> — ${r.category}</p><br>
+    <p><b>Designation:</b> ${r.designation}</p>
+    <p><b>Organization / Agency:</b> ${r.agency}</p>
+    <p><b>Institution Category:</b> ${r.institution}</p>
+    <p><b>Province:</b> ${r.province} &nbsp;•&nbsp; <b>Electorate:</b> ${r.electorate}</p>
+    <p><b>Political Party:</b> ${r.party}</p>
+    <p><b>Date of Resignation:</b> ${fmtDate(r.resigndate)}</p>
+    <p><b>Date Received (DPM Sec's Office):</b> ${fmtDate(r.receiveddate)}</p>
+    <p><b>Date of DPM Acknowledgement:</b> ${fmtDate(r.ackdate)}</p>
+    <p><b>Subject / Details:</b> ${r.subject}</p>
+    <p><b>Contact:</b> ${r.phone || 'TBA'} ${r.email ? ' / ' + r.email : ''}</p>
+    <p><b>Status:</b> <span class="status-pill ${statusClass(r.status)}">${r.status}</span></p>
+    <p><b>Remarks:</b> ${r.remarks}</p>
+    <p style="margin-top:10px;color:var(--txt-muted);font-size:11.5px;">Entered by ${r.enteredBy} · ${new Date(r.ts).toLocaleString()}</p>`;
+  openModal('detailModal');
+}
+
+// ═══════════════════════════════════════════
+// AUDIT LOG
+// ═══════════════════════════════════════════
+function auditDotColor(action) { return { 'Create':'var(--teal)', 'Update':'var(--gold)', 'Delete':'var(--red)', 'Sign in':'var(--blue)', 'Sign out':'var(--txt-muted)' }[action] || 'var(--txt-muted)'; }
+function renderAuditFull() {
+  document.getElementById('audit-full').innerHTML = auditLog.map(a => `
+    <div class="audit-item"><span class="audit-dot" style="background:${auditDotColor(a.action)}"></span>
+    <div style="flex:1;"><div>${a.detail}</div><div class="audit-time">${new Date(a.ts).toLocaleString()}</div></div></div>`).join('') || '<p style="color:var(--txt-muted);font-size:12.5px;">No activity yet.</p>';
+}
+function renderDashAudit() {
+  document.getElementById('dash-audit').innerHTML = auditLog.slice(0,6).map(a => `
+    <div class="audit-item"><span class="audit-dot" style="background:${auditDotColor(a.action)}"></span>
+    <div style="flex:1;"><div style="font-size:12px;">${a.detail}</div><div class="audit-time">${new Date(a.ts).toLocaleString()}</div></div></div>`).join('') || '<p style="color:var(--txt-muted);font-size:12.5px;">No activity yet.</p>';
+}
+
+// ═══════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════
+function exportCSV() {
+  const headers = ['Category','Name','Designation','Agency','Institution Category','Province','Electorate','Party','Date of Resignation','Date Received','Date Acknowledged','Phone','Email','Subject','Status','Remarks','Entered By'];
+  const rows = records.map(r => [r.category,r.name,r.designation,r.agency,r.institution,r.province,r.electorate,r.party,r.resigndate,r.receiveddate,r.ackdate,r.phone,r.email,r.subject,r.status,r.remarks,r.enteredBy]);
+  const csv = [headers, ...rows].map(row => row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `NGE2027_Register_Export_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  logAudit('Export', `${currentUser.name} exported the register to CSV`);
+}
+
+// ═══════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════
+let charts = {};
+function renderDashboard() {
+  document.getElementById('m-total').textContent = records.length;
+  document.getElementById('m-agency').textContent = records.filter(r => r.category === 'Agency Head').length;
+  document.getElementById('m-ack').textContent = records.filter(r => r.status === 'Acknowledged' || r.status === 'Released to PNGEC').length;
+  document.getElementById('m-pending').textContent = records.filter(r => r.status === 'Received' || r.status === 'Under Verification').length;
+  renderDashAudit();
+
+  if (typeof Chart === 'undefined') { return; }
+  const tick = 'rgba(240,244,255,0.55)', grid = 'rgba(255,255,255,0.06)', font = { family: 'Outfit', size: 11 };
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  const statuses = ['Received','Under Verification','Acknowledged','Released to PNGEC','Withdrawn'];
+  const statusCounts = statuses.map(s => records.filter(r => r.status === s).length);
+  charts.status = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: { labels: statuses, datasets: [{ data: statusCounts, backgroundColor: ['#3B82F6','#F0A500','#22C55E','#00C9B1','#E8394A'], borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { color: tick, font: { family:'Outfit', size:10.5 }, boxWidth: 10, padding: 10 } } } }
+  });
+
+  const agencyCount = records.filter(r => r.category === 'Agency Head').length;
+  const publicCount = records.filter(r => r.category === 'Public Servant').length;
+  charts.cat = new Chart(document.getElementById('catChart'), {
+    type: 'bar',
+    data: { labels: ['Agency Heads', 'Public Servants'], datasets: [{ data: [agencyCount, publicCount], backgroundColor: ['rgba(59,130,246,0.75)','rgba(240,165,0,0.75)'], borderRadius: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display:false }, ticks: { color: tick, font } }, y: { beginAtZero: true, ticks: { color: tick, font, stepSize:1 }, grid: { color: grid } } } }
+  });
+
+  const provCounts = {};
+  records.forEach(r => { const p = r.province || 'TBA'; provCounts[p] = (provCounts[p]||0)+1; });
+  const provLabels = Object.keys(provCounts);
+  charts.prov = new Chart(document.getElementById('provinceChart'), {
+    type: 'bar',
+    data: { labels: provLabels, datasets: [{ data: provLabels.map(p=>provCounts[p]), backgroundColor: 'rgba(0,201,177,0.7)', borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: tick, font, stepSize:1 }, grid: { color: grid } }, y: { grid: { display:false }, ticks: { color: tick, font: { family:'Outfit', size:10 } } } } }
+  });
+}
+function renderAll() { renderRegisters(); renderDashboard(); renderAuditFull(); renderFeedback(); }
+
+// ═══════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open')); });
+
+// ═══════════════════════════════════════════
+// OFFLINE DETECTION
+// ═══════════════════════════════════════════
+window.addEventListener('offline', () => { document.getElementById('offline-banner').style.display = 'block'; });
+window.addEventListener('online', () => { document.getElementById('offline-banner').style.display = 'none'; });
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.getElementById('login-year').textContent = new Date().getFullYear();
+function updateClock() { document.getElementById('tb-date').textContent = new Date().toLocaleString('en-GB', { weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+updateClock(); setInterval(updateClock, 30000);
+restoreSession();
+</script>
+</body>
+</html>
